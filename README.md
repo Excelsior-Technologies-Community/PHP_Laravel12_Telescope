@@ -1,5 +1,21 @@
 # PHP_Laravel12_Telescope
 
+<p align="center">
+    <a href="https://laravel.com/docs/12.x">
+        <img src="https://img.shields.io/badge/Laravel-12-red" alt="Laravel 12">
+    </a>
+    <a href="https://www.php.net/releases/8.3/en.php">
+        <img src="https://img.shields.io/badge/PHP-8.3-blue" alt="PHP 8.3">
+    </a>
+    <a href="https://github.com/laravel/telescope">
+        <img src="https://img.shields.io/badge/Laravel-Telescope-orange" alt="Laravel Telescope">
+    </a>
+    <a href="#">
+        <img src="https://img.shields.io/badge/Status-Active-success" alt="Project Status">
+    </a>
+</p>
+
+
 ## Overview
 
 PHP_Laravel12_Telescope is a comprehensive, production-ready guide for integrating Laravel Telescope into a Laravel 12 application. This documentation is designed for developers who want deep visibility into application behavior while maintaining security, performance, and clean logs.
