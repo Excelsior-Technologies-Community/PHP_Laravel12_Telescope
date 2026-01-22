@@ -37,7 +37,7 @@ The guide walks you through the entire lifecycle—from creating a fresh Laravel
 
 ---
 
-## Folder Structure (Important Files)
+## Folder Structure 
 
 ```text
 laravel12-app/
