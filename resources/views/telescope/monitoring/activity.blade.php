@@ -23,6 +23,7 @@
     >
 
     <style>
+
         body {
             background: #f5f7fb;
         }
@@ -37,6 +38,11 @@
             overflow: auto;
             font-size: 12px;
         }
+
+        .table {
+            vertical-align: middle;
+        }
+
     </style>
 
 </head>
@@ -51,8 +57,11 @@
             href="{{ route('monitoring.dashboard') }}"
             class="navbar-brand fw-bold"
         >
+
             <i class="bi bi-activity"></i>
+
             Telescope Monitoring
+
         </a>
 
         <div class="d-flex gap-2">
@@ -66,7 +75,7 @@
 
             <a
                 href="{{ route('monitoring.alerts') }}"
-                class="btn btn-outline-light btn-sm"
+                class="btn btn-outline-warning btn-sm"
             >
                 Alerts
             </a>
@@ -108,9 +117,54 @@
             <form
                 method="GET"
                 action="{{ route('monitoring.activity') }}"
+                id="activityFilterForm"
             >
 
                 <div class="row g-3">
+
+                    <!-- Feature 1: Date preset -->
+
+                    <div class="col-md-3">
+
+                        <label class="form-label fw-semibold">
+                            Date Preset
+                        </label>
+
+                        <select
+                            name="preset"
+                            class="form-select"
+                        >
+
+                            <option value="">
+                                Custom / All Dates
+                            </option>
+
+                            <option
+                                value="today"
+                                @selected(request('preset') === 'today')
+                            >
+                                Today
+                            </option>
+
+                            <option
+                                value="7days"
+                                @selected(request('preset') === '7days')
+                            >
+                                Last 7 Days
+                            </option>
+
+                            <option
+                                value="30days"
+                                @selected(request('preset') === '30days')
+                            >
+                                Last 30 Days
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                    <!-- Type -->
 
                     <div class="col-md-3">
 
@@ -148,7 +202,9 @@
                                     value="{{ $type }}"
                                     @selected(request('type') === $type)
                                 >
+
                                     {{ ucfirst($type) }}
+
                                 </option>
 
                             @endforeach
@@ -157,7 +213,98 @@
 
                     </div>
 
-                    <div class="col-md-3">
+                    <!-- Feature 3: Method -->
+
+                    <div class="col-md-2">
+
+                        <label class="form-label fw-semibold">
+                            HTTP Method
+                        </label>
+
+                        <select
+                            name="method"
+                            class="form-select"
+                        >
+
+                            <option value="">
+                                All
+                            </option>
+
+                            @foreach([
+                                'GET',
+                                'POST',
+                                'PUT',
+                                'PATCH',
+                                'DELETE'
+                            ] as $method)
+
+                                <option
+                                    value="{{ $method }}"
+                                    @selected(request('method') === $method)
+                                >
+                                    {{ $method }}
+                                </option>
+
+                            @endforeach
+
+                        </select>
+
+                    </div>
+
+                    <!-- Feature 2: Status -->
+
+                    <div class="col-md-2">
+
+                        <label class="form-label fw-semibold">
+                            HTTP Status
+                        </label>
+
+                        <select
+                            name="status"
+                            class="form-select"
+                        >
+
+                            <option value="">
+                                All
+                            </option>
+
+                            @foreach([
+                                200,
+                                201,
+                                204,
+                                301,
+                                302,
+                                400,
+                                401,
+                                403,
+                                404,
+                                419,
+                                422,
+                                429,
+                                500,
+                                502,
+                                503
+                            ] as $status)
+
+                                <option
+                                    value="{{ $status }}"
+                                    @selected(
+                                        (string) request('status')
+                                        === (string) $status
+                                    )
+                                >
+                                    {{ $status }}
+                                </option>
+
+                            @endforeach
+
+                        </select>
+
+                    </div>
+
+                    <!-- Search -->
+
+                    <div class="col-md-2">
 
                         <label class="form-label fw-semibold">
                             Search
@@ -168,12 +315,14 @@
                             name="search"
                             value="{{ request('search') }}"
                             class="form-control"
-                            placeholder="URI, query, exception..."
+                            placeholder="URI / SQL..."
                         >
 
                     </div>
 
-                    <div class="col-md-2">
+                    <!-- From -->
+
+                    <div class="col-md-3">
 
                         <label class="form-label fw-semibold">
                             From
@@ -188,7 +337,9 @@
 
                     </div>
 
-                    <div class="col-md-2">
+                    <!-- To -->
+
+                    <div class="col-md-3">
 
                         <label class="form-label fw-semibold">
                             To
@@ -203,24 +354,47 @@
 
                     </div>
 
-                    <div class="col-md-2 d-flex align-items-end">
+                    <!-- Buttons -->
+
+                    <div class="col-md-6 d-flex align-items-end">
 
                         <div class="d-flex gap-2 w-100">
 
                             <button
                                 type="submit"
-                                class="btn btn-primary flex-fill"
+                                class="btn btn-primary"
                             >
+
                                 <i class="bi bi-search"></i>
+
                                 Search
+
                             </button>
 
                             <a
                                 href="{{ route('monitoring.activity') }}"
                                 class="btn btn-outline-secondary"
                             >
+
                                 <i class="bi bi-arrow-clockwise"></i>
+
+                                Reset
+
                             </a>
+
+                            <!-- Feature 6: CSV -->
+
+                            <button
+                                type="button"
+                                class="btn btn-success"
+                                onclick="exportActivity()"
+                            >
+
+                                <i class="bi bi-filetype-csv"></i>
+
+                                Export CSV
+
+                            </button>
 
                         </div>
 
@@ -289,7 +463,9 @@
                             <td>
 
                                 <span class="badge text-bg-dark">
+
                                     {{ ucfirst($entry['type']) }}
+
                                 </span>
 
                             </td>
@@ -326,7 +502,9 @@
 
                                     @endif
 
-                                @elseif($entry['type'] === 'exception')
+                                @elseif(
+                                    $entry['type'] === 'exception'
+                                )
 
                                     <span class="badge text-bg-danger">
                                         Exception
@@ -358,7 +536,9 @@
                                     data-bs-toggle="modal"
                                     data-bs-target="#entryModal{{ $entry['sequence'] }}"
                                 >
+
                                     <i class="bi bi-eye"></i>
+
                                 </button>
 
                             </td>
@@ -382,6 +562,7 @@
                                         <h5 class="modal-title">
 
                                             {{ ucfirst($entry['type']) }}
+
                                             Entry
 
                                         </h5>
@@ -424,7 +605,10 @@
                                             Raw Telescope Data:
                                         </strong>
 
-                                        <pre class="bg-dark text-light p-3 rounded mt-2">{{ json_encode($entry['content'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                        <pre class="bg-dark text-light p-3 rounded mt-2">{{ json_encode(
+                                            $entry['content'],
+                                            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+                                        ) }}</pre>
 
                                     </div>
 
@@ -478,6 +662,35 @@
     </div>
 
 </div>
+
+<script>
+
+    /*
+     * Feature 6:
+     * Preserve current filters during CSV export.
+     */
+
+    function exportActivity()
+    {
+        const form =
+            document.getElementById(
+                'activityFilterForm'
+            );
+
+        const params =
+            new URLSearchParams(
+                new FormData(form)
+            );
+
+        const url =
+            "{{ route('monitoring.activity.export') }}"
+            + '?'
+            + params.toString();
+
+        window.location.href = url;
+    }
+
+</script>
 
 <script
     src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
