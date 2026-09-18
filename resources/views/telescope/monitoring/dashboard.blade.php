@@ -97,7 +97,7 @@
 
         </a>
 
-        <div class="d-flex gap-2">
+        <div class="d-flex flex-wrap gap-2">
 
             <a
                 href="{{ route('monitoring.dashboard') }}"
@@ -124,9 +124,25 @@
             </a>
 
             <a
-                href="/telescope"
+                href="{{ route('monitoring.security') }}"
+                class="btn btn-outline-danger btn-sm"
+            >
+                <i class="bi bi-shield-shaded"></i>
+                Security
+            </a>
+
+            <a
+                href="{{ route('monitoring.health') }}"
+                class="btn btn-outline-success btn-sm"
+            >
+                <i class="bi bi-heart-pulse"></i>
+                Health
+            </a>
+
+            <a
+                href="{{ url(config('telescope.path', 'telescope')) }}"
                 target="_blank"
-                class="btn btn-outline-info btn-sm"
+                class="btn btn-primary btn-sm"
             >
                 <i class="bi bi-binoculars"></i>
                 Telescope
@@ -142,21 +158,134 @@
 
     @if(session('success'))
 
-        <div class="alert alert-success alert-dismissible fade show">
+        <div class="alert alert-success alert-dismissible fade show rounded-3 mb-4 d-flex align-items-center gap-2">
 
-            <i class="bi bi-check-circle"></i>
+            <i class="bi bi-check-circle-fill fs-5"></i>
 
-            {{ session('success') }}
+            <div>{{ session('success') }}</div>
 
             <button
                 type="button"
-                class="btn-close"
+                class="btn-close ms-auto"
                 data-bs-dismiss="alert"
             ></button>
 
         </div>
 
     @endif
+
+    {{-- ================================================================= --}}
+    {{-- Module 1: Simulated Traffic & Error Generator --}}
+    {{-- ================================================================= --}}
+    <div class="card dashboard-card shadow-sm border-0 rounded-4 mb-4 bg-white overflow-hidden">
+        <div class="card-header bg-dark text-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <h5 class="fw-bold mb-0 d-flex align-items-center gap-2">
+                <span class="p-1 bg-warning text-dark rounded-circle fs-6">⚡</span>
+                Simulated Traffic & Error Generator (Live Testing Lab)
+            </h5>
+            <small class="text-white-50">Trigger real internal queries, errors, traffic spikes & jobs to verify Telescope Watchers</small>
+        </div>
+        <div class="card-body p-4 bg-light">
+            <div class="row g-3">
+                
+                {{-- 1. Slow Query --}}
+                <div class="col-lg-4 col-md-6">
+                    <div class="p-3 bg-white rounded-3 border h-100 d-flex flex-column justify-content-between shadow-sm">
+                        <div>
+                            <div class="fw-bold text-dark d-flex align-items-center gap-2 mb-1">
+                                <span class="badge bg-warning text-dark">💥 Query</span>
+                                Slow Database Query
+                            </div>
+                            <small class="text-muted d-block mb-3">Executes query with 1.2s delay to trigger Telescope Slow Query Watcher.</small>
+                        </div>
+                        <form method="POST" action="{{ route('monitoring.simulate', 'slow-query') }}">
+                            @csrf
+                            <button type="submit" class="btn btn-outline-warning text-dark btn-sm w-100 fw-semibold">
+                                ⚡ Simulate Slow Query
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                {{-- 2. 500 Unhandled Exception --}}
+                <div class="col-lg-4 col-md-6">
+                    <div class="p-3 bg-white rounded-3 border h-100 d-flex flex-column justify-content-between shadow-sm">
+                        <div>
+                            <div class="fw-bold text-dark d-flex align-items-center gap-2 mb-1">
+                                <span class="badge bg-danger">🚨 Error</span>
+                                500 Server Exception
+                            </div>
+                            <small class="text-muted d-block mb-3">Throws critical payment runtime exception to trigger Exception Watcher.</small>
+                        </div>
+                        <form method="POST" action="{{ route('monitoring.simulate', 'exception') }}">
+                            @csrf
+                            <button type="submit" class="btn btn-outline-danger btn-sm w-100 fw-semibold">
+                                🚨 Simulate Exception
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                {{-- 3. Burst Traffic Spike --}}
+                <div class="col-lg-4 col-md-6">
+                    <div class="p-3 bg-white rounded-3 border h-100 d-flex flex-column justify-content-between shadow-sm">
+                        <div>
+                            <div class="fw-bold text-dark d-flex align-items-center gap-2 mb-1">
+                                <span class="badge bg-primary">🚀 Spike</span>
+                                Burst Traffic (20 Reqs)
+                            </div>
+                            <small class="text-muted d-block mb-3">Fires 20 rapid requests with varied methods (GET, POST) & status codes.</small>
+                        </div>
+                        <form method="POST" action="{{ route('monitoring.simulate', 'burst-traffic') }}">
+                            @csrf
+                            <button type="submit" class="btn btn-outline-primary btn-sm w-100 fw-semibold">
+                                🚀 Fire 20 Rapid Requests
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                {{-- 4. Queue Job & Failure --}}
+                <div class="col-lg-6 col-md-6">
+                    <div class="p-3 bg-white rounded-3 border h-100 d-flex flex-column justify-content-between shadow-sm">
+                        <div>
+                            <div class="fw-bold text-dark d-flex align-items-center gap-2 mb-1">
+                                <span class="badge bg-info text-dark">📧 Queue</span>
+                                Queued Job & Failure
+                            </div>
+                            <small class="text-muted d-block mb-3">Dispatches background job and logs simulated timeout failure in Job Watcher.</small>
+                        </div>
+                        <form method="POST" action="{{ route('monitoring.simulate', 'queue-job') }}">
+                            @csrf
+                            <button type="submit" class="btn btn-outline-info text-dark btn-sm w-100 fw-semibold">
+                                📧 Simulate Queue Job
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                {{-- 5. Cache Miss & Lock Storm --}}
+                <div class="col-lg-6 col-md-12">
+                    <div class="p-3 bg-white rounded-3 border h-100 d-flex flex-column justify-content-between shadow-sm">
+                        <div>
+                            <div class="fw-bold text-dark d-flex align-items-center gap-2 mb-1">
+                                <span class="badge bg-secondary">🛑 Cache</span>
+                                Cache Miss & Mutex Lock
+                            </div>
+                            <small class="text-muted d-block mb-3">Performs cache invalidate, atomic lock acquisition, and fresh cache write.</small>
+                        </div>
+                        <form method="POST" action="{{ route('monitoring.simulate', 'cache-miss') }}">
+                            @csrf
+                            <button type="submit" class="btn btn-outline-secondary btn-sm w-100 fw-semibold">
+                                🛑 Simulate Cache Miss & Lock
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
 
     <div class="d-flex justify-content-between align-items-center mb-4">
 
