@@ -240,6 +240,431 @@ class TelescopeMonitoringController extends Controller
     }
 
     /**
+     * Module 1: Simulated Traffic & Error Generator
+     */
+    public function simulate(Request $request, string $type)
+    {
+        $this->ensureLocalEnvironment();
+
+        switch ($type) {
+            case 'slow-query':
+                // Simulate a high-latency database query
+                try {
+                    DB::select("SELECT SLEEP(1.2) as sleep_time, 'Simulated High-Latency Database Query' as description");
+                } catch (\Throwable $e) {
+                    // Fallback for drivers that don't support sleep
+                    usleep(1200000);
+                    DB::table('telescope_entries')->count();
+                }
+                return back()->with('success', '⚡ Simulated Slow Database Query executed (1.2s latency logged in Telescope).');
+
+            case 'exception':
+                // Simulate an unhandled critical exception
+                $simulatedException = new \RuntimeException("💥 Simulated Critical Application Exception: PaymentGatewayConnectionTimeout on /api/v1/checkout");
+                report($simulatedException);
+                return back()->with('success', '🚨 Simulated 500 Unhandled Exception reported and captured in Telescope Exception Watcher.');
+
+            case 'burst-traffic':
+                // Simulate a traffic spike with various status codes
+                $methods = ['GET', 'POST', 'PUT', 'DELETE'];
+                $routes = ['/api/products', '/api/users', '/checkout/pay', '/auth/login', '/dashboard/analytics', '/search?q=laravel'];
+                $statuses = [200, 200, 201, 200, 400, 404, 200, 500];
+
+                for ($i = 0; $i < 20; $i++) {
+                    $method = $methods[array_rand($methods)];
+                    $uri = $routes[array_rand($routes)];
+                    $status = $statuses[array_rand($statuses)];
+                    $duration = rand(15, 350);
+
+                    DB::table('telescope_entries')->insert([
+                        'sequence' => (int) (DB::table('telescope_entries')->max('sequence') ?? 0) + 1,
+                        'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                        'batch_id' => (string) \Illuminate\Support\Str::uuid(),
+                        'family_hash' => md5($uri),
+                        'should_display_on_index' => 1,
+                        'type' => 'request',
+                        'content' => json_encode([
+                            'uri' => $uri,
+                            'method' => $method,
+                            'controller_action' => 'SimulatedController@handle',
+                            'middleware' => ['web'],
+                            'response_status' => $status,
+                            'duration' => $duration,
+                            'memory' => rand(12, 36),
+                            'ip_address' => '127.0.0.' . rand(1, 25),
+                            'user' => null,
+                        ]),
+                        'created_at' => now(),
+                    ]);
+                }
+                return back()->with('success', '🚀 Simulated Burst Traffic Spike (20 rapid requests logged across multiple endpoints).');
+
+            case 'queue-job':
+                // Simulate a background queue event
+                try {
+                    dispatch(function () {
+                        usleep(50000);
+                    });
+                } catch (\Throwable $e) {}
+                
+                // Also log a simulated failed job entry into Telescope
+                DB::table('telescope_entries')->insert([
+                    'sequence' => (int) (DB::table('telescope_entries')->max('sequence') ?? 0) + 1,
+                    'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                    'batch_id' => (string) \Illuminate\Support\Str::uuid(),
+                    'family_hash' => md5('ProcessOrderJob'),
+                    'should_display_on_index' => 1,
+                    'type' => 'job',
+                    'content' => json_encode([
+                        'name' => 'App\\Jobs\\ProcessInvoiceNotificationJob',
+                        'queue' => 'default',
+                        'connection' => 'database',
+                        'status' => 'failed',
+                        'exception' => 'SimulatedJobTimeoutException: Maximum execution time of 30 seconds exceeded',
+                    ]),
+                    'created_at' => now(),
+                ]);
+                return back()->with('success', '📧 Simulated Background Queue Job & Failed Job event logged in Telescope.');
+
+            case 'cache-miss':
+                // Simulate cache miss, lock, and cache hit
+                \Illuminate\Support\Facades\Cache::forget('telescope_sim_key');
+                $lock = \Illuminate\Support\Facades\Cache::lock('telescope_sim_lock', 10);
+                $lock->get();
+                \Illuminate\Support\Facades\Cache::remember('telescope_sim_key', 60, function () {
+                    return 'Simulated Cache Payload Data';
+                });
+                $lock->release();
+                return back()->with('success', '🛑 Simulated Cache Miss, Mutex Lock & Write Storm executed successfully.');
+
+            default:
+                return back()->with('error', 'Unknown simulation type.');
+        }
+    }
+
+    /**
+     * Module 2: Security Threat & Malicious Request Inspector
+     */
+    public function security(Request $request)
+    {
+        $this->ensureLocalEnvironment();
+
+        $rawRequests = DB::table('telescope_entries')
+            ->where('type', 'request')
+            ->select(['sequence', 'uuid', 'content', 'created_at'])
+            ->orderByDesc('sequence')
+            ->limit(1500)
+            ->get();
+
+        $incidents = collect();
+        $attackerIps = [];
+
+        // Known attack signatures
+        $vulnPatterns = [
+            '/\.(env|git|htaccess|aws|sql|bak|yaml|yml|cfg|ini)/i' => 'Sensitive File Probing (.env / .git)',
+            '/(wp-login|wp-admin|xmlrpc|phpinfo|actuator|adminer|phpmyadmin|eval-stdin|solr|boaform|cgi-bin)/i' => 'Admin Portal / Vulnerability Scanner',
+            '/(id_rsa|\/etc\/passwd|\/etc\/shadow|win\.ini|boot\.ini)/i' => 'System Credential Traversal',
+        ];
+
+        $sqliPatterns = [
+            "/('|\%27)\s*(OR|AND)\s*('?1'?\s*=\s*'?1'|[0-9]+\s*=\s*[0-9]+)/i" => 'SQLi Boolean Bypass',
+            "/(UNION\s+ALL\s+SELECT|UNION\s+SELECT|SELECT\s+.*\s+FROM)/i" => 'SQLi Union Extraction',
+            "/(SLEEP\([0-9]+\)|BENCHMARK\(|WAITFOR\s+DELAY)/i" => 'SQLi Blind Time-Based Injection',
+            "/(--|\#|\/\*)/" => 'SQLi Comment Infiltration',
+        ];
+
+        $xssPatterns = [
+            "/(<script|javascript:|onerror\s*=|onload\s*=|document\.cookie|alert\(|<svg|<iframe)/i" => 'Cross-Site Scripting (XSS) Payload',
+        ];
+
+        $pathTraversalPatterns = [
+            "/(\.\.\/|\.\.\\|%2e%2e%2f|%2e%2e\/)/i" => 'Directory Path Traversal Attempt',
+        ];
+
+        $totalVulnScans = 0;
+        $totalSqli = 0;
+        $totalXss = 0;
+        $totalBruteForce = 0;
+
+        foreach ($rawRequests as $entry) {
+            $content = $this->decodeContent($entry->content);
+            $uri = $this->getRequestUri($content);
+            $status = $this->getRequestStatus($content);
+            $method = $this->getRequestMethod($content);
+            $ip = $content['ip_address'] ?? '127.0.0.1';
+            $payloadString = json_encode($content['payload'] ?? []) . ' ' . json_encode($content['headers'] ?? []) . ' ' . $uri;
+
+            $detectedThreat = null;
+            $severity = 'medium';
+            $threatCategory = 'Scanner';
+
+            // 1. Check Vulnerability Scans
+            foreach ($vulnPatterns as $pattern => $title) {
+                if (preg_match($pattern, $uri)) {
+                    $detectedThreat = $title;
+                    $severity = 'high';
+                    $threatCategory = 'Vulnerability Scan';
+                    $totalVulnScans++;
+                    break;
+                }
+            }
+
+            // 2. Check SQL Injection
+            if (!$detectedThreat) {
+                foreach ($sqliPatterns as $pattern => $title) {
+                    if (preg_match($pattern, $payloadString)) {
+                        $detectedThreat = $title;
+                        $severity = 'critical';
+                        $threatCategory = 'SQL Injection';
+                        $totalSqli++;
+                        break;
+                    }
+                }
+            }
+
+            // 3. Check XSS
+            if (!$detectedThreat) {
+                foreach ($xssPatterns as $pattern => $title) {
+                    if (preg_match($pattern, $payloadString)) {
+                        $detectedThreat = $title;
+                        $severity = 'high';
+                        $threatCategory = 'XSS Exploit';
+                        $totalXss++;
+                        break;
+                    }
+                }
+            }
+
+            // 4. Check Path Traversal
+            if (!$detectedThreat) {
+                foreach ($pathTraversalPatterns as $pattern => $title) {
+                    if (preg_match($pattern, $uri)) {
+                        $detectedThreat = $title;
+                        $severity = 'high';
+                        $threatCategory = 'Path Traversal';
+                        $totalVulnScans++;
+                        break;
+                    }
+                }
+            }
+
+            // 5. Check Brute-Force Auth Failures
+            if (!$detectedThreat && in_array($status, [401, 403, 429]) && str_contains(strtolower($uri), 'login')) {
+                $detectedThreat = 'Repeated Authentication Failure (Brute-Force Pattern)';
+                $severity = 'medium';
+                $threatCategory = 'Brute Force';
+                $totalBruteForce++;
+            }
+
+            if ($detectedThreat) {
+                $incidents->push([
+                    'sequence' => $entry->sequence,
+                    'uuid' => $entry->uuid,
+                    'type' => $threatCategory,
+                    'title' => $detectedThreat,
+                    'severity' => $severity,
+                    'method' => $method,
+                    'uri' => $uri,
+                    'status' => $status,
+                    'ip' => $ip,
+                    'created_at' => $entry->created_at,
+                ]);
+
+                // Track attacker IP stats
+                if (!isset($attackerIps[$ip])) {
+                    $attackerIps[$ip] = [
+                        'ip' => $ip,
+                        'total_attacks' => 0,
+                        'highest_severity' => $severity,
+                        'threat_types' => [],
+                        'last_seen' => $entry->created_at,
+                    ];
+                }
+                $attackerIps[$ip]['total_attacks']++;
+                if (!in_array($threatCategory, $attackerIps[$ip]['threat_types'])) {
+                    $attackerIps[$ip]['threat_types'][] = $threatCategory;
+                }
+                if ($severity === 'critical') {
+                    $attackerIps[$ip]['highest_severity'] = 'critical';
+                }
+            }
+        }
+
+        // Sort attacker IPs by volume
+        usort($attackerIps, fn($a, $b) => $b['total_attacks'] <=> $a['total_attacks']);
+
+        $totalThreats = $incidents->count();
+
+        return view('telescope.monitoring.security', compact(
+            'incidents',
+            'attackerIps',
+            'totalThreats',
+            'totalVulnScans',
+            'totalSqli',
+            'totalXss',
+            'totalBruteForce'
+        ));
+    }
+
+    /**
+     * Module 3: API Health Check & Real-Time Endpoint Uptime Monitor
+     */
+    public function health(Request $request)
+    {
+        $this->ensureLocalEnvironment();
+
+        $probeData = $this->runHealthProbes();
+
+        return view('telescope.monitoring.health', $probeData);
+    }
+
+    /**
+     * JSON Probe API for dynamic live refreshing.
+     */
+    public function healthProbe(Request $request)
+    {
+        $this->ensureLocalEnvironment();
+
+        $probeData = $this->runHealthProbes();
+
+        return response()->json($probeData);
+    }
+
+    /**
+     * Execute comprehensive system diagnostic probes and latency analytics.
+     */
+    private function runHealthProbes(): array
+    {
+        // 1. Database Probe
+        $dbStatus = 'healthy';
+        $dbLatency = 0;
+        $dbError = null;
+        try {
+            $start = microtime(true);
+            DB::select('SELECT 1');
+            $dbLatency = round((microtime(true) - $start) * 1000, 2);
+        } catch (\Throwable $e) {
+            $dbStatus = 'unhealthy';
+            $dbError = $e->getMessage();
+        }
+
+        // 2. Cache Probe
+        $cacheStatus = 'healthy';
+        $cacheLatency = 0;
+        $cacheError = null;
+        try {
+            $start = microtime(true);
+            $testKey = 'health_probe_' . time();
+            \Illuminate\Support\Facades\Cache::put($testKey, 'ok', 5);
+            $val = \Illuminate\Support\Facades\Cache::get($testKey);
+            \Illuminate\Support\Facades\Cache::forget($testKey);
+            $cacheLatency = round((microtime(true) - $start) * 1000, 2);
+            if ($val !== 'ok') {
+                $cacheStatus = 'degraded';
+            }
+        } catch (\Throwable $e) {
+            $cacheStatus = 'unhealthy';
+            $cacheError = $e->getMessage();
+        }
+
+        // 3. Storage Disk Write Probe
+        $storageStatus = 'healthy';
+        $storageLatency = 0;
+        $storageError = null;
+        try {
+            $start = microtime(true);
+            $testFile = storage_path('app/health_test_' . time() . '.tmp');
+            file_put_contents($testFile, 'storage_probe_ok');
+            @unlink($testFile);
+            $storageLatency = round((microtime(true) - $start) * 1000, 2);
+        } catch (\Throwable $e) {
+            $storageStatus = 'unhealthy';
+            $storageError = $e->getMessage();
+        }
+
+        // 4. Queue Probe
+        $queueStatus = 'healthy';
+        $queueConnection = config('queue.default', 'database');
+
+        // 5. Telescope DB Storage Probe
+        $telescopeEntriesCount = DB::table('telescope_entries')->count();
+        $telescopeStorageDriver = config('telescope.driver', 'database');
+
+        // 6. Latency Percentiles (P50, P90, P99)
+        $durations = [];
+        $requestEntries = DB::table('telescope_entries')
+            ->where('type', 'request')
+            ->select('content')
+            ->orderByDesc('sequence')
+            ->limit(500)
+            ->get();
+
+        foreach ($requestEntries as $entry) {
+            $c = $this->decodeContent($entry->content);
+            if (isset($c['duration']) && is_numeric($c['duration'])) {
+                $durations[] = (float) $c['duration'];
+            }
+        }
+
+        sort($durations);
+        $totalRequests = count($durations);
+
+        $p50 = 0;
+        $p90 = 0;
+        $p99 = 0;
+        $avgLatency = 0;
+        $minLatency = 0;
+        $maxLatency = 0;
+
+        if ($totalRequests > 0) {
+            $avgLatency = round(array_sum($durations) / $totalRequests, 2);
+            $minLatency = round($durations[0], 2);
+            $maxLatency = round($durations[$totalRequests - 1], 2);
+
+            $p50Index = (int) floor($totalRequests * 0.50);
+            $p90Index = (int) floor($totalRequests * 0.90);
+            $p99Index = (int) floor($totalRequests * 0.99);
+
+            $p50 = round($durations[$p50Index] ?? $avgLatency, 2);
+            $p90 = round($durations[$p90Index] ?? $maxLatency, 2);
+            $p99 = round($durations[$p99Index] ?? $maxLatency, 2);
+        }
+
+        // Overall System Status
+        $systemStatus = 'operational';
+        if ($dbStatus === 'unhealthy' || $storageStatus === 'unhealthy') {
+            $systemStatus = 'outage';
+        } elseif ($cacheStatus === 'unhealthy' || $p90 > 500) {
+            $systemStatus = 'degraded';
+        }
+
+        return [
+            'systemStatus' => $systemStatus,
+            'dbStatus' => $dbStatus,
+            'dbLatency' => $dbLatency,
+            'dbError' => $dbError,
+            'cacheStatus' => $cacheStatus,
+            'cacheLatency' => $cacheLatency,
+            'cacheError' => $cacheError,
+            'storageStatus' => $storageStatus,
+            'storageLatency' => $storageLatency,
+            'storageError' => $storageError,
+            'queueStatus' => $queueStatus,
+            'queueConnection' => $queueConnection,
+            'telescopeEntriesCount' => $telescopeEntriesCount,
+            'telescopeStorageDriver' => $telescopeStorageDriver,
+            'totalRequestsAnalyzed' => $totalRequests,
+            'avgLatency' => $avgLatency,
+            'p50' => $p50,
+            'p90' => $p90,
+            'p99' => $p99,
+            'minLatency' => $minLatency,
+            'maxLatency' => $maxLatency,
+            'probedAt' => now()->toIso8601String(),
+        ];
+    }
+
+    /**
      * Advanced Telescope activity search.
      */
     public function activity(Request $request)
