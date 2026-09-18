@@ -5,6 +5,16 @@ use App\Http\Controllers\TelescopeMonitoringController;
 
 /*
 |--------------------------------------------------------------------------
+| Root Redirect
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/', function () {
+    return redirect()->route('monitoring.dashboard');
+});
+
+/*
+|--------------------------------------------------------------------------
 | Telescope Monitoring Center
 |--------------------------------------------------------------------------
 */
@@ -36,8 +46,36 @@ Route::prefix('monitoring')->group(function () {
     ])->name('monitoring.alerts');
 
     /*
-     * Feature 6:
-     * CSV export
+     * Module 2: Security Threat & Malicious Request Inspector
+     */
+    Route::get('/security', [
+        TelescopeMonitoringController::class,
+        'security'
+    ])->name('monitoring.security');
+
+    /*
+     * Module 3: API Health Check & Latency Distribution
+     */
+    Route::get('/health', [
+        TelescopeMonitoringController::class,
+        'health'
+    ])->name('monitoring.health');
+
+    Route::get('/health/probe', [
+        TelescopeMonitoringController::class,
+        'healthProbe'
+    ])->name('monitoring.health.probe');
+
+    /*
+     * Module 1: Simulated Traffic & Error Generator
+     */
+    Route::post('/simulate/{type}', [
+        TelescopeMonitoringController::class,
+        'simulate'
+    ])->name('monitoring.simulate');
+
+    /*
+     * Activity CSV export
      */
     Route::get('/activity/export', [
         TelescopeMonitoringController::class,
@@ -45,7 +83,6 @@ Route::prefix('monitoring')->group(function () {
     ])->name('monitoring.activity.export');
 
     /*
-     * Feature 7:
      * Cleanup old Telescope data
      */
     Route::delete('/cleanup', [

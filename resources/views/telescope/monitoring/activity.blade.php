@@ -64,27 +64,54 @@
 
         </a>
 
-        <div class="d-flex gap-2">
+        <div class="d-flex flex-wrap gap-2">
 
             <a
                 href="{{ route('monitoring.dashboard') }}"
                 class="btn btn-outline-light btn-sm"
             >
+                <i class="bi bi-speedometer2"></i>
                 Dashboard
+            </a>
+
+            <a
+                href="{{ route('monitoring.activity') }}"
+                class="btn btn-light btn-sm"
+            >
+                <i class="bi bi-search"></i>
+                Activity
             </a>
 
             <a
                 href="{{ route('monitoring.alerts') }}"
                 class="btn btn-outline-warning btn-sm"
             >
+                <i class="bi bi-exclamation-triangle"></i>
                 Alerts
             </a>
 
             <a
-                href="/telescope"
-                target="_blank"
-                class="btn btn-outline-info btn-sm"
+                href="{{ route('monitoring.security') }}"
+                class="btn btn-outline-danger btn-sm"
             >
+                <i class="bi bi-shield-shaded"></i>
+                Security
+            </a>
+
+            <a
+                href="{{ route('monitoring.health') }}"
+                class="btn btn-outline-success btn-sm"
+            >
+                <i class="bi bi-heart-pulse"></i>
+                Health
+            </a>
+
+            <a
+                href="{{ url(config('telescope.path', 'telescope')) }}"
+                target="_blank"
+                class="btn btn-primary btn-sm"
+            >
+                <i class="bi bi-binoculars"></i>
                 Telescope
             </a>
 
